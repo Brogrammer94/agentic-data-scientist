@@ -40,8 +40,10 @@ OR_APP_NAME = os.getenv("OR_APP_NAME", "Agentic Data Scientist")
 __all__ = [
     'DEFAULT_MODEL',
     'REVIEW_MODEL',
+    'CODING_MODEL',
     'DEFAULT_MODEL_NAME',
     'REVIEW_MODEL_NAME',  # Export model name strings
+    'CODING_MODEL_NAME',
     'OPENROUTER_API_KEY',
     'OPENROUTER_API_BASE',
     'get_generate_content_config',
@@ -69,6 +71,14 @@ DEFAULT_MODEL = LiteLlm(
 
 REVIEW_MODEL = LiteLlm(
     model=REVIEW_MODEL_NAME,
+    num_retries=10,
+    timeout=60,
+    api_base=OPENROUTER_API_BASE if OPENROUTER_API_KEY else None,
+    custom_llm_provider="openrouter" if OPENROUTER_API_KEY else None,
+)
+
+CODING_MODEL = LiteLlm(
+    model=CODING_MODEL_NAME,
     num_retries=10,
     timeout=60,
     api_base=OPENROUTER_API_BASE if OPENROUTER_API_KEY else None,

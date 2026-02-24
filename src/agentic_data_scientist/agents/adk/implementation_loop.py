@@ -6,6 +6,7 @@ iterative loop to implement and verify solutions.
 """
 
 import logging
+import os
 
 from google.adk.planners import BuiltInPlanner
 from google.adk.tools.tool_context import CallbackContext
@@ -14,7 +15,7 @@ from google.genai import types
 from agentic_data_scientist.agents.adk.event_compression import create_compression_callback
 from agentic_data_scientist.agents.adk.loop_detection import LoopDetectionAgent
 from agentic_data_scientist.agents.adk.review_confirmation import create_review_confirmation_agent
-from agentic_data_scientist.agents.adk.utils import REVIEW_MODEL, get_generate_content_config
+from agentic_data_scientist.agents.adk.utils import CODING_MODEL, REVIEW_MODEL, get_generate_content_config
 from agentic_data_scientist.prompts import load_prompt
 
 
@@ -74,8 +75,7 @@ def make_implementation_agents(working_dir: str, tools: list):
     """
     logger.info(f"[AgenticDS] Initializing implementation agents with {len(tools)} tools")
 
-    # Always use ClaudeCodeAgent for coding
-    from agentic_data_scientist.agents.claude_code import ClaudeCodeAgent
+    coding_backend = os.getenv("CODING_AGENT_BACKEND", "claude_code").strip().lower()
 
     # Create compression callback for coding agent
     coding_compression_callback = create_compression_callback(
@@ -83,13 +83,34 @@ def make_implementation_agents(working_dir: str, tools: list):
         overlap_size=20,
     )
 
-    coding_agent = ClaudeCodeAgent(
-        name="coding_agent",
-        description="A coding agent that uses Claude Code SDK to implement plans.",
-        working_dir=working_dir,
-        output_key="implementation_summary",
-        after_agent_callback=coding_compression_callback,  # Explicit callback for event compression
-    )
+    if coding_backend == "litellm":
+        coding_agent = LoopDetectionAgent(
+            name="coding_agent",
+            description="A coding agent powered by LiteLLM-compatible providers (OpenRouter/OpenAI/etc.).",
+            instruction=load_prompt("coding_base"),
+            model=CODING_MODEL,
+            tools=tools,
+            output_key="implementation_summary",
+            planner=BuiltInPlanner(
+                thinking_config=types.ThinkingConfig(
+                    include_thoughts=True,
+                    thinking_budget=-1,
+                ),
+            ),
+            generate_content_config=get_generate_content_config(temperature=0.2),
+            after_agent_callback=coding_compression_callback,
+        )
+    else:
+        # Default: Claude Code SDK backend
+        from agentic_data_scientist.agents.claude_code import ClaudeCodeAgent
+
+        coding_agent = ClaudeCodeAgent(
+            name="coding_agent",
+            description="A coding agent that uses Claude Code SDK to implement plans.",
+            working_dir=working_dir,
+            output_key="implementation_summary",
+            after_agent_callback=coding_compression_callback,  # Explicit callback for event compression
+        )
 
     # Review Agent - Uses ADK with loop detection
     logger.info("[AgenticDS] Creating review agent")

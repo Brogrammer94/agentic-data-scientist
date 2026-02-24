@@ -66,7 +66,7 @@ class TestImplementationLoop:
             assert review_agent.name == "review_agent"
 
     def test_coding_agent_is_claude_code(self):
-        """Test that coding agent is always ClaudeCodeAgent."""
+        """Test that default coding backend uses ClaudeCodeAgent."""
         import tempfile
 
         from agentic_data_scientist.agents.adk.implementation_loop import make_implementation_agents
@@ -76,3 +76,16 @@ class TestImplementationLoop:
             coding_agent, review_agent, review_confirmation = make_implementation_agents(tmpdir, [])
 
             assert isinstance(coding_agent, ClaudeCodeAgent)
+
+    def test_coding_agent_can_use_litellm_backend(self, monkeypatch):
+        """Test that coding agent can switch to LiteLLM backend."""
+        import tempfile
+
+        from agentic_data_scientist.agents.adk.implementation_loop import make_implementation_agents
+
+        monkeypatch.setenv("CODING_AGENT_BACKEND", "litellm")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            coding_agent, review_agent, review_confirmation = make_implementation_agents(tmpdir, [])
+
+            assert coding_agent.name == "coding_agent"
+            assert review_agent.name == "review_agent"
