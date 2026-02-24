@@ -38,8 +38,8 @@ Before using Agentic Data Scientist, you must have:
    Or visit [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart)
 
 2. **Required API Keys** configured (see Configuration section below)
-   - OPENROUTER_API_KEY (for planning and review agents)
-   - ANTHROPIC_API_KEY (for coding agent)
+   - OPENROUTER_API_KEY (for planning and review agents, and optional coding via LiteLLM)
+   - ANTHROPIC_API_KEY (only required when using Claude Code backend)
 
 ### Installation
 
@@ -55,7 +55,7 @@ uvx agentic-data-scientist --mode simple "your query here"
 
 **API Keys**
 
-You must configure two API keys:
+You can configure one or two API keys depending on coding backend:
 
 1. **OpenRouter API Key** (required for planning and review agents):
    ```bash
@@ -63,16 +63,26 @@ You must configure two API keys:
    ```
    Get your key at: https://openrouter.ai/keys
 
-2. **Anthropic API Key** (required for coding agent):
+2. **Anthropic API Key** (required only for Claude Code backend):
    ```bash
    export ANTHROPIC_API_KEY="your_key_here"
    ```
    Get your key at: https://console.anthropic.com/
 
+
+3. **Choose coding backend** (optional, defaults to Claude Code):
+   ```bash
+   export CODING_AGENT_BACKEND="claude_code"  # or "litellm"
+   ```
+
+   - `claude_code`: Uses Claude Agent SDK + Claude Skills
+   - `litellm`: Uses LiteLLM-compatible providers (OpenRouter/OpenAI/Codex/OpenCode-compatible endpoints)
+
 Alternatively, create a `.env` file in your project directory:
 ```bash
 OPENROUTER_API_KEY=your_key_here
 ANTHROPIC_API_KEY=your_key_here
+CODING_AGENT_BACKEND=claude_code
 ```
 
 **Network Access Control** (Optional)
@@ -278,6 +288,7 @@ Create a `.env` file:
 ```bash
 # Required: API keys
 ANTHROPIC_API_KEY=your_key_here
+CODING_AGENT_BACKEND=claude_code
 GOOGLE_API_KEY=your_key_here
 
 # Optional: Model configuration

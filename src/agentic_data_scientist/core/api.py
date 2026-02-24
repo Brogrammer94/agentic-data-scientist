@@ -7,6 +7,7 @@ with optional conversation context and file handling.
 
 import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -158,13 +159,37 @@ class DataScientist:
             from google.adk.agents import Agent
             from google.adk.apps import App
             from google.adk.apps.app import EventsCompactionConfig
+            from google.adk.planners import BuiltInPlanner
 
+            from agentic_data_scientist.agents.adk.utils import CODING_MODEL, get_generate_content_config
             from agentic_data_scientist.agents.claude_code import ClaudeCodeAgent
+            from agentic_data_scientist.prompts import load_prompt
 
-            # Create claude code agent
-            claude_agent = ClaudeCodeAgent(
-                working_dir=str(self.working_dir),
-            )
+            coding_backend = os.getenv("CODING_AGENT_BACKEND", "claude_code").strip().lower()
+
+            if coding_backend == "litellm":
+                # Generic direct coding mode via LiteLLM providers (OpenRouter/OpenAI/Codex/etc.)
+                claude_agent = Agent(
+                    name="coding_agent",
+                    description="Direct coding agent using LiteLLM-compatible providers.",
+                    instruction=load_prompt("coding_base"),
+                    model=CODING_MODEL,
+                    tools=self._build_local_tools(),
+                    planner=BuiltInPlanner(
+                        thinking_config=types.ThinkingConfig(
+                            include_thoughts=True,
+                            thinking_budget=-1,
+                        ),
+                    ),
+                    output_key="implementation_summary",
+                    generate_content_config=get_generate_content_config(temperature=0.2),
+                )
+            else:
+                # Create claude code agent
+                claude_agent = ClaudeCodeAgent(
+                    working_dir=str(self.working_dir),
+                )
+
             self.agent = claude_agent
 
             # Create App with compression config (no caching for claude_code)
@@ -211,6 +236,53 @@ class DataScientist:
             )
 
         logger.info(f"Agent setup complete: {self.config.agent_type}")
+
+    def _build_local_tools(self) -> List[Any]:
+        """Build local file/network tools bound to this session's working directory."""
+        from agentic_data_scientist.agents.adk.utils import is_network_disabled
+        from agentic_data_scientist.tools import (
+            directory_tree,
+            fetch_url,
+            get_file_info,
+            list_directory,
+            read_file,
+            read_media_file,
+            search_files,
+        )
+
+        working_dir_str = str(self.working_dir)
+
+        def read_file_bound(path: str, head: Optional[int] = None, tail: Optional[int] = None) -> str:
+            return read_file(path, working_dir_str, head, tail)
+
+        def read_media_file_bound(path: str) -> str:
+            return read_media_file(path, working_dir_str)
+
+        def list_directory_bound(path: str = ".", show_sizes: bool = False, sort_by: str = "name") -> str:
+            return list_directory(path, working_dir_str, show_sizes, sort_by)
+
+        def directory_tree_bound(path: str = ".", exclude_patterns: Optional[list[str]] = None) -> str:
+            return directory_tree(path, working_dir_str, exclude_patterns)
+
+        def search_files_bound(pattern: str, path: str = ".", exclude_patterns: Optional[list[str]] = None) -> str:
+            return search_files(pattern, working_dir_str, path, exclude_patterns)
+
+        def get_file_info_bound(path: str) -> str:
+            return get_file_info(path, working_dir_str)
+
+        tools = [
+            read_file_bound,
+            read_media_file_bound,
+            list_directory_bound,
+            directory_tree_bound,
+            search_files_bound,
+            get_file_info_bound,
+        ]
+
+        if not is_network_disabled():
+            tools.append(fetch_url)
+
+        return tools
 
     def save_files(self, files: List[tuple]) -> List[FileInfo]:
         """
